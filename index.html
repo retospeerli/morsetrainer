@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Morse-Lernapp</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>Morse-Lernapp</h1>
+      <p class="subtitle">Hören, nachmorsen, Buchstaben lernen</p>
+    </header>
+
+    <main>
+      <section id="startScreen" class="panel">
+        <h2>Start</h2>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Buchstaben wählen</h3>
+
+            <div class="preset-row">
+              <button class="preset-btn" data-preset="all">Alle</button>
+              <button class="preset-btn" data-preset="none">Keine</button>
+              <button class="preset-btn" data-preset="etianm">E T I A N M</button>
+              <button class="preset-btn" data-preset="surwdkgo">S U R W D K G O</button>
+              <button class="preset-btn" data-preset="hvflpjbxcyzq">H V F L P J B X C Y Z Q</button>
+            </div>
+
+            <div id="letterSelection" class="letter-grid"></div>
+          </div>
+
+          <div class="card">
+            <h3>Einstellungen</h3>
+
+            <label class="setting">
+              <span>Geschwindigkeit (Punktdauer): <strong id="unitLabel">140 ms</strong></span>
+              <input id="unitSlider" type="range" min="80" max="260" step="10" value="140" />
+            </label>
+
+            <label class="setting">
+              <span>Tonhöhe: <strong id="freqLabel">650 Hz</strong></span>
+              <input id="freqSlider" type="range" min="300" max="1000" step="10" value="650" />
+            </label>
+
+            <label class="setting">
+              <span>Toleranz: <strong id="toleranceLabel">mittel</strong></span>
+              <input id="toleranceSlider" type="range" min="0" max="2" step="1" value="1" />
+            </label>
+
+            <div class="info-box">
+              <p><strong>Steuerung:</strong></p>
+              <p>Drücke und halte die <strong>Leertaste</strong> oder den grossen Taster auf dem Bildschirm.</p>
+              <p><strong>Kurz</strong> = Punkt · &nbsp;&nbsp; <strong>Lang</strong> = Strich −</p>
+            </div>
+
+            <button id="startBtn" class="primary-btn">Training starten</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="trainingScreen" class="panel hidden">
+        <div class="top-bar">
+          <div>
+            <h2>Training</h2>
+            <p id="selectedLettersInfo" class="small-text"></p>
+          </div>
+          <button id="backBtn" class="ghost-btn">Zurück</button>
+        </div>
+
+        <div class="grid two training-grid">
+          <div class="card target-card">
+            <p class="label">Zielbuchstabe</p>
+            <div id="targetLetter" class="target-letter">E</div>
+
+            <div class="target-actions">
+              <button id="playBtn" class="secondary-btn">Vorspielen</button>
+              <button id="nextBtn" class="secondary-btn">Nächster Buchstabe</button>
+            </div>
+
+            <div class="morse-hint">
+              <p class="small-text">Höre genau hin und morde den Buchstaben dann mit der Taste nach.</p>
+            </div>
+          </div>
+
+          <div class="card input-card">
+            <p class="label">Deine Eingabe</p>
+
+            <div id="livePattern" class="live-pattern">–</div>
+            <div id="liveDecode" class="live-decode">…</div>
+
+            <button id="morseKey" class="morse-key" aria-label="Morsetaste">
+              Drücken und halten
+            </button>
+
+            <div class="legend">
+              <div><strong>Leertaste</strong> oder Taste am Bildschirm</div>
+              <div><strong>Kurz</strong> = Punkt · &nbsp; <strong>Lang</strong> = Strich −</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card feedback-card">
+          <p class="label">Rückmeldung</p>
+          <div id="feedback" class="feedback neutral">Noch keine Eingabe.</div>
+        </div>
+
+        <div class="grid three">
+          <div class="card stat-card">
+            <p class="label">Richtig</p>
+            <div id="correctCount" class="stat-value">0</div>
+          </div>
+          <div class="card stat-card">
+            <p class="label">Versuche</p>
+            <div id="attemptCount" class="stat-value">0</div>
+          </div>
+          <div class="card stat-card">
+            <p class="label">Trefferquote</p>
+            <div id="accuracy" class="stat-value">0%</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
