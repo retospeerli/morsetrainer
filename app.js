@@ -1,3 +1,11 @@
+// ===============================
+// Morse-Lernapp
+// kompletter Neuaufbau app.js
+// ===============================
+
+// ---------------------------------
+// Morse-Daten
+// ---------------------------------
 const MORSE_MAP = {
   A: ".-",
   B: "-...",
@@ -29,6 +37,22 @@ const MORSE_MAP = {
 
 const LETTERS = Object.keys(MORSE_MAP);
 
+const WORDS = [
+  "BERG", "TAL", "WALD", "WIESE", "FELD", "FLUSS", "BACH", "SEE", "INSEL", "UFER",
+  "STRAND", "FELS", "WEG", "PFAD", "HANG", "EBENE", "WOLKE", "HIMMEL", "REGEN", "WIND",
+  "HAUS", "HUTTE", "TURM", "KIRCHE", "SCHULE", "BAHNHOF", "HALLE", "GARAGE", "HAFEN", "BRUCKE",
+  "TUNNEL", "MAUER", "ZAUN", "TOR", "FENSTER", "DACH", "KELLER", "HOF", "STALL", "WERK",
+  "STRASSE", "GASSE", "KREUZUNG", "KURVE", "KREISEL", "AMPEL", "SCHILD", "GLEIS", "RAMPE", "PLATZ",
+  "PARKPLATZ", "HALTESTELLE", "LINIE", "KARTE", "PLAN", "SPUR", "ROUTE", "ZIEL", "START", "UMWEG",
+  "AUTO", "BUS", "TRAM", "ZUG", "TAXI", "VELO", "RAD", "LASTWAGEN", "ANHANGER", "WAGEN",
+  "LOK", "WAGGON", "SCHIFF", "BOOT", "KAHN", "FAEHRE", "UBOOT", "KRAN", "CONTAINER", "PAKET",
+  "RAKETE", "KAPSEL", "ROVER", "SATELLIT", "MOND", "STERN", "PLANET", "FUNK", "ANTENNE", "SENDER",
+  "EMPFANGER", "SIGNAL", "TASTE", "KNOPF", "LAMPE", "SIRENE", "LAUTER", "AKKU", "MOTOR", "PROPELLER"
+];
+
+// ---------------------------------
+// DOM
+// ---------------------------------
 const startScreen = document.getElementById("startScreen");
 const trainingScreen = document.getElementById("trainingScreen");
 const letterSelection = document.getElementById("letterSelection");
@@ -55,8 +79,14 @@ const correctCountEl = document.getElementById("correctCount");
 const attemptCountEl = document.getElementById("attemptCount");
 const accuracyEl = document.getElementById("accuracy");
 
+// ---------------------------------
+// App-Zustand
+// ---------------------------------
 let selectedLetters = ["E", "T", "I", "A", "N", "M"];
+let currentMode = "letter"; // "letter" | "word"
 let currentTarget = "E";
+let currentWordProgress = "";
+let currentInputSymbols = "";
 
 let stats = {
   correct: 0,
@@ -69,18 +99,81 @@ let gainNode = null;
 
 let isPressing = false;
 let pressStartTime = 0;
-let releaseTime = 0;
-let finalizeTimer = null;
+let finalizeLetterTimer = null;
+let finalizeWordTimer = null;
 
-let currentInputSymbols = "";
-
+// ---------------------------------
+// Toleranz-Profile
+// ---------------------------------
 const toleranceSettings = [
-  { name: "streng", dotMaxFactor: 1.8, dashMinFactor: 1.8, letterPauseFactor: 2.6 },
-  { name: "mittel", dotMaxFactor: 2.2, dashMinFactor: 2.2, letterPauseFactor: 2.8 },
-  { name: "grosszügig", dotMaxFactor: 2.8, dashMinFactor: 2.0, letterPauseFactor: 3.2 }
+  {
+    name: "streng",
+    dotMaxFactor: 1.8,
+    letterPauseFactor: 2.5,
+    wordPauseFactor: 6.0
+  },
+  {
+    name: "mittel",
+    dotMaxFactor: 2.2,
+    letterPauseFactor: 2.9,
+    wordPauseFactor: 6.8
+  },
+  {
+    name: "grosszügig",
+    dotMaxFactor: 2.8,
+    letterPauseFactor: 3.3,
+    wordPauseFactor: 7.8
+  }
 ];
 
+// ---------------------------------
+// Initialisierung
+// ---------------------------------
+function init() {
+  buildLetterSelection();
+  injectModeSelector();
+  updateLabels();
+  updateStats();
+  updateModeUI();
+  setupEventListeners();
+}
+
+function injectModeSelector() {
+  const settingsCard = startBtn.closest(".card");
+  if (!settingsCard) return;
+
+  const modeBox = document.createElement("div");
+  modeBox.className = "info-box";
+  modeBox.style.marginBottom = "18px";
+  modeBox.innerHTML = `
+    <p><strong>Modus:</strong></p>
+    <label style="display:block; margin:6px 0;">
+      <input type="radio" name="trainMode" value="letter" checked />
+      Buchstaben üben
+    </label>
+    <label style="display:block; margin:6px 0;">
+      <input type="radio" name="trainMode" value="word" />
+      Ganze Wörter üben
+    </label>
+  `;
+
+  settingsCard.insertBefore(modeBox, settingsCard.querySelector(".info-box"));
+
+  const radios = modeBox.querySelectorAll('input[name="trainMode"]');
+  radios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      currentMode = radio.value;
+      updateModeUI();
+    });
+  });
+}
+
+// ---------------------------------
+// UI-Helfer
+// ---------------------------------
 function buildLetterSelection() {
+  if (!letterSelection) return;
+
   letterSelection.innerHTML = "";
 
   LETTERS.forEach((letter) => {
@@ -106,10 +199,11 @@ function buildLetterSelection() {
 }
 
 function updateSelectedLettersFromUI() {
+  if (!letterSelection) return;
+
   const checked = [...letterSelection.querySelectorAll('input[type="checkbox"]:checked')].map(
     (cb) => cb.value
   );
-
   selectedLetters = checked;
 }
 
@@ -127,6 +221,8 @@ function applyPreset(name) {
 }
 
 function syncLetterCheckboxes() {
+  if (!letterSelection) return;
+
   const checkboxes = [...letterSelection.querySelectorAll('input[type="checkbox"]')];
   checkboxes.forEach((cb) => {
     cb.checked = selectedLetters.includes(cb.value);
@@ -139,6 +235,67 @@ function updateLabels() {
   toleranceLabel.textContent = toleranceSettings[Number(toleranceSlider.value)].name;
 }
 
+function updateModeUI() {
+  const isWordMode = currentMode === "word";
+
+  const letterCard = letterSelection ? letterSelection.closest(".card") : null;
+  if (letterCard) {
+    letterCard.style.opacity = isWordMode ? "0.45" : "1";
+    letterCard.style.pointerEvents = isWordMode ? "none" : "auto";
+  }
+
+  if (selectedLettersInfo) {
+    if (isWordMode) {
+      selectedLettersInfo.textContent = "Modus: Ganze Wörter üben";
+    } else {
+      selectedLettersInfo.textContent = `Ausgewählte Buchstaben: ${selectedLetters.join(", ")}`;
+    }
+  }
+}
+
+function setFeedback(text, type = "neutral") {
+  feedback.textContent = text;
+  feedback.className = `feedback ${type}`;
+}
+
+function updateStats() {
+  correctCountEl.textContent = String(stats.correct);
+  attemptCountEl.textContent = String(stats.attempts);
+
+  const accuracy =
+    stats.attempts === 0 ? 0 : Math.round((stats.correct / stats.attempts) * 100);
+  accuracyEl.textContent = `${accuracy}%`;
+}
+
+function resetCurrentInput() {
+  currentInputSymbols = "";
+  livePattern.textContent = "–";
+
+  if (currentMode === "word") {
+    liveDecode.textContent = currentWordProgress || "…";
+  } else {
+    liveDecode.textContent = "…";
+  }
+
+  clearLetterTimer();
+}
+
+function updateLiveDisplay() {
+  livePattern.textContent = currentInputSymbols || "–";
+
+  const decoded = patternToLetter(currentInputSymbols);
+
+  if (currentMode === "letter") {
+    liveDecode.textContent = decoded || "…";
+  } else {
+    const preview = decoded ? currentWordProgress + decoded : currentWordProgress || "…";
+    liveDecode.textContent = preview || "…";
+  }
+}
+
+// ---------------------------------
+// Grundeinstellungen
+// ---------------------------------
 function getUnit() {
   return Number(unitSlider.value);
 }
@@ -151,6 +308,9 @@ function getTolerance() {
   return toleranceSettings[Number(toleranceSlider.value)];
 }
 
+// ---------------------------------
+// Audio
+// ---------------------------------
 function ensureAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -163,7 +323,6 @@ function ensureAudio() {
 
 function startTone() {
   ensureAudio();
-
   stopTone();
 
   oscillator = audioCtx.createOscillator();
@@ -182,8 +341,8 @@ function stopTone() {
   if (oscillator) {
     try {
       oscillator.stop();
-    } catch (e) {
-      // no-op
+    } catch (err) {
+      // ignore
     }
     oscillator.disconnect();
     oscillator = null;
@@ -199,15 +358,8 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function playTarget() {
+async function playMorsePattern(pattern) {
   ensureAudio();
-
-  const pattern = MORSE_MAP[currentTarget];
-  if (!pattern) return;
-
-  playBtn.disabled = true;
-  nextBtn.disabled = true;
-  morseKey.disabled = true;
 
   const unit = getUnit();
 
@@ -223,6 +375,33 @@ async function playTarget() {
       await sleep(unit);
     }
   }
+}
+
+async function playTarget() {
+  ensureAudio();
+
+  playBtn.disabled = true;
+  nextBtn.disabled = true;
+  morseKey.disabled = true;
+
+  const unit = getUnit();
+
+  if (currentMode === "letter") {
+    const pattern = MORSE_MAP[currentTarget];
+    await playMorsePattern(pattern);
+  } else {
+    for (let i = 0; i < currentTarget.length; i++) {
+      const ch = currentTarget[i];
+      const pattern = MORSE_MAP[ch];
+      if (!pattern) continue;
+
+      await playMorsePattern(pattern);
+
+      if (i < currentTarget.length - 1) {
+        await sleep(unit * 3);
+      }
+    }
+  }
 
   await sleep(unit * 3);
 
@@ -231,41 +410,9 @@ async function playTarget() {
   morseKey.disabled = false;
 }
 
-function pickNextTarget() {
-  if (!selectedLetters.length) return;
-
-  let next = currentTarget;
-  if (selectedLetters.length === 1) {
-    next = selectedLetters[0];
-  } else {
-    while (next === currentTarget) {
-      next = selectedLetters[Math.floor(Math.random() * selectedLetters.length)];
-    }
-  }
-
-  currentTarget = next;
-  targetLetterEl.textContent = currentTarget;
-
-  resetCurrentInput();
-  setFeedback("Noch keine Eingabe.", "neutral");
-}
-
-function resetCurrentInput() {
-  currentInputSymbols = "";
-  livePattern.textContent = "–";
-  liveDecode.textContent = "…";
-
-  if (finalizeTimer) {
-    clearTimeout(finalizeTimer);
-    finalizeTimer = null;
-  }
-}
-
-function setFeedback(text, type = "neutral") {
-  feedback.textContent = text;
-  feedback.className = `feedback ${type}`;
-}
-
+// ---------------------------------
+// Morse-Auswertung
+// ---------------------------------
 function patternToLetter(pattern) {
   for (const [letter, morse] of Object.entries(MORSE_MAP)) {
     if (morse === pattern) return letter;
@@ -273,21 +420,13 @@ function patternToLetter(pattern) {
   return null;
 }
 
-function updateLiveDisplay() {
-  livePattern.textContent = currentInputSymbols || "–";
-  const letter = patternToLetter(currentInputSymbols);
-  liveDecode.textContent = letter ? letter : "…";
-}
-
 function handlePressStart() {
   if (isPressing) return;
 
   ensureAudio();
 
-  if (finalizeTimer) {
-    clearTimeout(finalizeTimer);
-    finalizeTimer = null;
-  }
+  clearLetterTimer();
+  clearWordTimer();
 
   isPressing = true;
   pressStartTime = performance.now();
@@ -310,32 +449,95 @@ function handlePressEnd() {
   currentInputSymbols += symbol;
   updateLiveDisplay();
 
-  releaseTime = performance.now();
+  scheduleLetterFinalize();
+  scheduleWordFinalize();
+}
 
-  const finalizeAfter = unit * tolerance.letterPauseFactor;
+function scheduleLetterFinalize() {
+  clearLetterTimer();
 
-  finalizeTimer = setTimeout(() => {
+  const unit = getUnit();
+  const tolerance = getTolerance();
+  const waitMs = unit * tolerance.letterPauseFactor;
+
+  finalizeLetterTimer = setTimeout(() => {
     finalizeCurrentLetter();
-  }, finalizeAfter);
+  }, waitMs);
+}
+
+function scheduleWordFinalize() {
+  if (currentMode !== "word") return;
+
+  clearWordTimer();
+
+  const unit = getUnit();
+  const tolerance = getTolerance();
+  const waitMs = unit * tolerance.wordPauseFactor;
+
+  finalizeWordTimer = setTimeout(() => {
+    finalizeCurrentWord();
+  }, waitMs);
+}
+
+function clearLetterTimer() {
+  if (finalizeLetterTimer) {
+    clearTimeout(finalizeLetterTimer);
+    finalizeLetterTimer = null;
+  }
+}
+
+function clearWordTimer() {
+  if (finalizeWordTimer) {
+    clearTimeout(finalizeWordTimer);
+    finalizeWordTimer = null;
+  }
 }
 
 function finalizeCurrentLetter() {
   if (!currentInputSymbols) return;
 
   const decoded = patternToLetter(currentInputSymbols);
-  stats.attempts += 1;
 
   if (!decoded) {
+    if (currentMode === "word") {
+      stats.attempts += 1;
+      setFeedback(
+        `Die Folge ${currentInputSymbols} gehört zu keinem Buchstaben. Wort neu versuchen.`,
+        "warning"
+      );
+      currentWordProgress = "";
+      updateStats();
+      resetCurrentInput();
+      liveDecode.textContent = "…";
+      return;
+    }
+
+    stats.attempts += 1;
     setFeedback(
       `Die Folge ${currentInputSymbols} gehört zu keinem Buchstaben. Versuche es noch einmal.`,
       "warning"
     );
-  } else if (decoded === currentTarget) {
+    updateStats();
+    resetCurrentInput();
+    return;
+  }
+
+  if (currentMode === "letter") {
+    evaluateLetterMode(decoded);
+  } else {
+    evaluateWordLetter(decoded);
+  }
+
+  currentInputSymbols = "";
+  livePattern.textContent = "–";
+}
+
+function evaluateLetterMode(decoded) {
+  stats.attempts += 1;
+
+  if (decoded === currentTarget) {
     stats.correct += 1;
-    setFeedback(
-      `Richtig! ${currentTarget} = ${MORSE_MAP[currentTarget]}`,
-      "success"
-    );
+    setFeedback(`Richtig! ${currentTarget} = ${MORSE_MAP[currentTarget]}`, "success");
   } else {
     setFeedback(
       `Nicht richtig. Du hast ${decoded} gemorst. Gesucht war ${currentTarget}.`,
@@ -344,24 +546,119 @@ function finalizeCurrentLetter() {
   }
 
   updateStats();
-  currentInputSymbols = "";
-  updateLiveDisplay();
+  liveDecode.textContent = decoded;
 }
 
-function updateStats() {
-  correctCountEl.textContent = stats.correct;
-  attemptCountEl.textContent = stats.attempts;
+function evaluateWordLetter(decoded) {
+  currentWordProgress += decoded;
+  liveDecode.textContent = currentWordProgress;
 
-  const accuracy =
-    stats.attempts === 0 ? 0 : Math.round((stats.correct / stats.attempts) * 100);
+  if (!currentTarget.startsWith(currentWordProgress)) {
+    stats.attempts += 1;
+    setFeedback(
+      `Falsch begonnen: ${currentWordProgress}. Gesucht ist ${currentTarget}. Wort neu versuchen.`,
+      "error"
+    );
+    currentWordProgress = "";
+    updateStats();
+    liveDecode.textContent = "…";
+    clearWordTimer();
+    return;
+  }
 
-  accuracyEl.textContent = `${accuracy}%`;
+  if (currentWordProgress === currentTarget) {
+    finalizeCurrentWord(true);
+    return;
+  }
+
+  setFeedback(`Gut. Bisher: ${currentWordProgress}`, "neutral");
 }
 
+function finalizeCurrentWord(forceComplete = false) {
+  if (currentMode !== "word") return;
+
+  clearWordTimer();
+
+  if (!currentWordProgress) return;
+
+  stats.attempts += 1;
+
+  if (currentWordProgress === currentTarget && forceComplete) {
+    stats.correct += 1;
+    setFeedback(`Richtig! Das Wort lautet ${currentTarget}.`, "success");
+    updateStats();
+    currentWordProgress = "";
+    pickNextTarget();
+    return;
+  }
+
+  if (currentWordProgress === currentTarget) {
+    stats.correct += 1;
+    setFeedback(`Richtig! Das Wort lautet ${currentTarget}.`, "success");
+  } else {
+    setFeedback(
+      `Wortende erkannt. Du hast ${currentWordProgress} gemorst. Gesucht war ${currentTarget}.`,
+      "error"
+    );
+  }
+
+  updateStats();
+  currentWordProgress = "";
+  pickNextTarget();
+}
+
+// ---------------------------------
+// Zielauswahl
+// ---------------------------------
+function pickNextTarget() {
+  if (currentMode === "letter") {
+    if (!selectedLetters.length) return;
+
+    let next = currentTarget;
+
+    if (selectedLetters.length === 1) {
+      next = selectedLetters[0];
+    } else {
+      while (next === currentTarget) {
+        next = selectedLetters[Math.floor(Math.random() * selectedLetters.length)];
+      }
+    }
+
+    currentTarget = next;
+    targetLetterEl.textContent = currentTarget;
+    if (selectedLettersInfo) {
+      selectedLettersInfo.textContent = `Ausgewählte Buchstaben: ${selectedLetters.join(", ")}`;
+    }
+  } else {
+    let next = currentTarget;
+
+    if (WORDS.length === 1) {
+      next = WORDS[0];
+    } else {
+      while (next === currentTarget) {
+        next = WORDS[Math.floor(Math.random() * WORDS.length)];
+      }
+    }
+
+    currentTarget = next;
+    targetLetterEl.textContent = currentTarget;
+    if (selectedLettersInfo) {
+      selectedLettersInfo.textContent = "Modus: Ganze Wörter üben";
+    }
+  }
+
+  currentWordProgress = "";
+  resetCurrentInput();
+  setFeedback("Noch keine Eingabe.", "neutral");
+}
+
+// ---------------------------------
+// Trainingsstart / Ende
+// ---------------------------------
 function startTraining() {
   updateSelectedLettersFromUI();
 
-  if (!selectedLetters.length) {
+  if (currentMode === "letter" && !selectedLetters.length) {
     alert("Bitte wähle mindestens einen Buchstaben aus.");
     return;
   }
@@ -369,26 +666,28 @@ function startTraining() {
   startScreen.classList.add("hidden");
   trainingScreen.classList.remove("hidden");
 
-  selectedLettersInfo.textContent = `Ausgewählte Buchstaben: ${selectedLetters.join(", ")}`;
-
   stats = { correct: 0, attempts: 0 };
   updateStats();
 
-  currentTarget = selectedLetters[Math.floor(Math.random() * selectedLetters.length)];
-  targetLetterEl.textContent = currentTarget;
-  resetCurrentInput();
-  setFeedback("Noch keine Eingabe.", "neutral");
-
+  pickNextTarget();
   ensureAudio();
 }
 
 function goBackToStart() {
   stopTone();
+  clearLetterTimer();
+  clearWordTimer();
+
+  currentWordProgress = "";
   resetCurrentInput();
+
   startScreen.classList.remove("hidden");
   trainingScreen.classList.add("hidden");
 }
 
+// ---------------------------------
+// Events
+// ---------------------------------
 function setupEventListeners() {
   unitSlider.addEventListener("input", updateLabels);
   freqSlider.addEventListener("input", updateLabels);
@@ -398,7 +697,10 @@ function setupEventListeners() {
   backBtn.addEventListener("click", goBackToStart);
 
   playBtn.addEventListener("click", playTarget);
-  nextBtn.addEventListener("click", pickNextTarget);
+  nextBtn.addEventListener("click", () => {
+    currentWordProgress = "";
+    pickNextTarget();
+  });
 
   document.querySelectorAll(".preset-btn").forEach((btn) => {
     btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
@@ -425,7 +727,7 @@ function setupEventListeners() {
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space") {
       e.preventDefault();
-      if (!trainingScreen.classList.contains("hidden")) {
+      if (!trainingScreen.classList.contains("hidden") && !e.repeat) {
         handlePressStart();
       }
     }
@@ -443,13 +745,6 @@ function setupEventListeners() {
   window.addEventListener("blur", () => {
     if (isPressing) handlePressEnd();
   });
-}
-
-function init() {
-  buildLetterSelection();
-  updateLabels();
-  updateStats();
-  setupEventListeners();
 }
 
 init();
