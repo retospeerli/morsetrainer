@@ -278,6 +278,19 @@ function resetWordMorseAttempt() {
   setFeedback("Worteingabe gelöscht.", "neutral");
 }
 
+function resetSameWordTask() {
+  currentWordLetters = [];
+  currentLetterIndex = 0;
+  currentInputSymbols = "";
+  livePattern.textContent = "–";
+
+  if (wordMorseDisplayMode === "immediate") {
+    liveDecode.textContent = "";
+  } else {
+    liveDecode.textContent = "••••";
+  }
+}
+
 function setupWordMorseDisplay() {
   currentWordLetters = [];
   currentLetterIndex = 0;
@@ -461,12 +474,19 @@ function finalizeLetterModeInput() {
   if (decoded === currentTarget) {
     stats.correct += 1;
     setFeedback(`Richtig! ${currentTarget} = ${MORSE_MAP[currentTarget]}`, "success");
-  } else {
-    setFeedback(
-      `Nicht richtig. Du hast ${decoded} gemorst. Gesucht war ${currentTarget}.`,
-      "error"
-    );
+    updateStats();
+
+    setTimeout(() => {
+      pickNextTarget();
+    }, 700);
+
+    return;
   }
+
+  setFeedback(
+    `Nicht richtig. Du hast ${decoded} gemorst. Gesucht war ${currentTarget}.`,
+    "error"
+  );
 
   updateStats();
 }
@@ -481,12 +501,24 @@ function finalizeWordMorseLetter() {
   livePattern.textContent = "–";
 
   if (!decoded) {
-    currentWordLetters.push("?");
-    if (wordMorseDisplayMode === "immediate") {
-      updateImmediateWordDisplay();
-    }
-    setFeedback(`Die Folge ${typedPattern} wurde als unbekannt gespeichert.`, "warning");
-    currentLetterIndex += 1;
+    setFeedback(
+      `Die Folge ${typedPattern} gehört zu keinem Buchstaben. Das Wort beginnt neu.`,
+      "warning"
+    );
+
+    resetSameWordTask();
+    return;
+  }
+
+  const expectedLetter = currentTarget[currentLetterIndex];
+
+  if (decoded !== expectedLetter) {
+    setFeedback(
+      `Falsch: Du hast ${decoded} gemorst. Erwartet war ${expectedLetter}. Das Wort beginnt neu.`,
+      "error"
+    );
+
+    resetSameWordTask();
     return;
   }
 
@@ -496,10 +528,24 @@ function finalizeWordMorseLetter() {
   if (wordMorseDisplayMode === "immediate") {
     updateImmediateWordDisplay();
   } else {
-    liveDecode.textContent = "••••";
+    liveDecode.textContent = "•".repeat(currentWordLetters.length);
   }
 
-  setFeedback(`Buchstabe ${currentLetterIndex} gespeichert: ${decoded}`, "neutral");
+  if (currentWordLetters.join("") === currentTarget) {
+    stats.attempts += 1;
+    stats.correct += 1;
+    updateStats();
+
+    setFeedback(`Richtig! Du hast ${currentTarget} korrekt gemorst.`, "success");
+
+    setTimeout(() => {
+      pickNextTarget();
+    }, 800);
+
+    return;
+  }
+
+  setFeedback(`Richtig bis hier: ${currentWordLetters.join("")}`, "neutral");
 }
 
 function finishWordMorseAttempt() {
@@ -519,8 +565,15 @@ function finishWordMorseAttempt() {
   if (typedWord === currentTarget) {
     stats.correct += 1;
     setFeedback(`Richtig! Du hast das Wort ${currentTarget} korrekt gemorst.`, "success");
+
+    setTimeout(() => {
+      pickNextTarget();
+    }, 800);
   } else {
-    setFeedback("Nicht ganz richtig. Fehler sind markiert.", "error");
+    setFeedback("Nicht ganz richtig. Fehler sind markiert. Das Wort beginnt neu.", "error");
+    setTimeout(() => {
+      resetSameWordTask();
+    }, 1200);
   }
 
   liveDecode.innerHTML = resultMarkup;
@@ -581,6 +634,10 @@ function checkTextAnswer() {
     stats.correct += 1;
     targetLetterEl.textContent = currentTarget;
     setFeedback(`Richtig! Das gehörte Wort war ${currentTarget}.`, "success");
+
+    setTimeout(() => {
+      pickNextTarget();
+    }, 900);
   } else {
     targetLetterEl.textContent = currentTarget;
     setFeedback(`Nicht richtig. Deine Antwort: ${typed || "∅"}. Lösung: ${currentTarget}.`, "error");
@@ -633,7 +690,7 @@ function handlePressEnd() {
     if (wordMorseDisplayMode === "immediate") {
       liveDecode.textContent = currentWordLetters.join("") + (decoded || "");
     } else {
-      liveDecode.textContent = "••••";
+      liveDecode.textContent = "•".repeat(currentWordLetters.length);
     }
   }
 
