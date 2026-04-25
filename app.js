@@ -1,37 +1,9 @@
-// =====================================
-// MORSE-LERNAPP
-// komplette app.js
-// =====================================
-
-// -------------------------------------
-// Morse-Zuordnung
-// -------------------------------------
 const MORSE_MAP = {
-  A: ".-",
-  B: "-...",
-  C: "-.-.",
-  D: "-..",
-  E: ".",
-  F: "..-.",
-  G: "--.",
-  H: "....",
-  I: "..",
-  J: ".---",
-  K: "-.-",
-  L: ".-..",
-  M: "--",
-  N: "-.",
-  O: "---",
-  P: ".--.",
-  Q: "--.-",
-  R: ".-.",
-  S: "...",
-  T: "-",
-  U: "..-",
-  V: "...-",
-  W: ".--",
-  X: "-..-",
-  Y: "-.--",
+  A: ".-", B: "-...", C: "-.-.", D: "-..", E: ".",
+  F: "..-.", G: "--.", H: "....", I: "..", J: ".---",
+  K: "-.-", L: ".-..", M: "--", N: "-.", O: "---",
+  P: ".--.", Q: "--.-", R: ".-.", S: "...", T: "-",
+  U: "..-", V: "...-", W: ".--", X: "-..-", Y: "-.--",
   Z: "--.."
 };
 
@@ -50,9 +22,6 @@ const WORDS = [
   "EMPFANGER", "SIGNAL", "TASTE", "KNOPF", "LAMPE", "SIRENE", "LAUTER", "AKKU", "MOTOR", "PROPELLER"
 ];
 
-// -------------------------------------
-// DOM
-// -------------------------------------
 const startScreen = document.getElementById("startScreen");
 const trainingScreen = document.getElementById("trainingScreen");
 const letterSelection = document.getElementById("letterSelection");
@@ -79,19 +48,34 @@ const correctCountEl = document.getElementById("correctCount");
 const attemptCountEl = document.getElementById("attemptCount");
 const accuracyEl = document.getElementById("accuracy");
 
-// -------------------------------------
-// Zustand
-// -------------------------------------
+const morseInputArea = document.getElementById("morseInputArea");
+const textInputArea = document.getElementById("textInputArea");
+const textAnswerInput = document.getElementById("textAnswerInput");
+const textCheckBtn = document.getElementById("textCheckBtn");
+const textRevealBtn = document.getElementById("textRevealBtn");
+
+const finishWordBtn = document.getElementById("finishWordBtn");
+const clearWordBtn = document.getElementById("clearWordBtn");
+const wordActionRow = document.getElementById("wordActionRow");
+
+const chooseKeyBtn = document.getElementById("chooseKeyBtn");
+const currentKeyLabel = document.getElementById("currentKeyLabel");
+const currentKeyLabel2 = document.getElementById("currentKeyLabel2");
+
 let selectedLetters = ["E", "T", "I", "A", "N", "M"];
 
-let mainMode = "letter"; // letter | word_morse | word_audio_text
-let wordMorseDisplayMode = "immediate"; // immediate | hidden
+let mainMode = "letter";
+let wordMorseDisplayMode = "immediate";
 
 let currentTarget = "E";
 
 let currentInputSymbols = "";
 let currentWordLetters = [];
 let currentLetterIndex = 0;
+
+let morseKeyCode = "Space";
+let morseKeyLabel = "Leertaste";
+let waitingForKeyChoice = false;
 
 let stats = {
   correct: 0,
@@ -106,199 +90,22 @@ let isPressing = false;
 let pressStartTime = 0;
 let finalizeLetterTimer = null;
 
-// dynamisch erzeugte UI
-let injectedUI = {
-  modeBox: null,
-  wordActionRow: null,
-  finishWordBtn: null,
-  clearWordBtn: null,
-  textInputWrap: null,
-  textAnswerInput: null,
-  textCheckBtn: null,
-  textRevealBtn: null
-};
-
 const toleranceSettings = [
   { name: "streng", dotMaxFactor: 1.8, letterPauseFactor: 2.6 },
   { name: "mittel", dotMaxFactor: 2.2, letterPauseFactor: 3.0 },
   { name: "grosszügig", dotMaxFactor: 2.8, letterPauseFactor: 3.6 }
 ];
 
-// -------------------------------------
-// Initialisierung
-// -------------------------------------
 function init() {
   buildLetterSelection();
-  injectExtraUI();
   updateLabels();
   updateStats();
+  updateMorseKeyLabels();
   updateModeUI();
   setupEventListeners();
 }
 
-function injectExtraUI() {
-  injectModeSelector();
-  injectWordButtons();
-  injectTextInputArea();
-}
-
-function injectModeSelector() {
-  const settingsCard = startBtn.closest(".card");
-  if (!settingsCard) return;
-
-  const box = document.createElement("div");
-  box.className = "info-box";
-  box.style.marginBottom = "18px";
-  box.innerHTML = `
-    <p><strong>Modus:</strong></p>
-
-    <label style="display:block; margin:6px 0;">
-      <input type="radio" name="mainMode" value="letter" checked>
-      Buchstaben üben
-    </label>
-
-    <label style="display:block; margin:6px 0;">
-      <input type="radio" name="mainMode" value="word_morse">
-      Wort sehen und morsen
-    </label>
-
-    <label style="display:block; margin:6px 0;">
-      <input type="radio" name="mainMode" value="word_audio_text">
-      Morse hören und Wort schreiben
-    </label>
-
-    <hr style="margin:12px 0; border:none; border-top:1px solid #d7deea;">
-
-    <p><strong>Anzeige bei Wort sehen und morsen:</strong></p>
-
-    <label style="display:block; margin:6px 0;">
-      <input type="radio" name="wordDisplayMode" value="immediate" checked>
-      Buchstaben sofort anzeigen
-    </label>
-
-    <label style="display:block; margin:6px 0;">
-      <input type="radio" name="wordDisplayMode" value="hidden">
-      Buchstaben erst nach Überprüfung anzeigen
-    </label>
-  `;
-
-  const firstInfoBox = settingsCard.querySelector(".info-box");
-  if (firstInfoBox) {
-    settingsCard.insertBefore(box, firstInfoBox);
-  } else {
-    settingsCard.insertBefore(box, startBtn);
-  }
-
-  box.querySelectorAll('input[name="mainMode"]').forEach((radio) => {
-    radio.addEventListener("change", () => {
-      if (radio.checked) {
-        mainMode = radio.value;
-        updateModeUI();
-      }
-    });
-  });
-
-  box.querySelectorAll('input[name="wordDisplayMode"]').forEach((radio) => {
-    radio.addEventListener("change", () => {
-      if (radio.checked) {
-        wordMorseDisplayMode = radio.value;
-        updateModeUI();
-      }
-    });
-  });
-
-  injectedUI.modeBox = box;
-}
-
-function injectWordButtons() {
-  const inputCard = livePattern.closest(".card");
-  if (!inputCard) return;
-
-  const row = document.createElement("div");
-  row.style.display = "flex";
-  row.style.gap = "10px";
-  row.style.flexWrap = "wrap";
-  row.style.marginTop = "14px";
-
-  const finishBtn = document.createElement("button");
-  finishBtn.type = "button";
-  finishBtn.className = "secondary-btn";
-  finishBtn.textContent = "Wort prüfen";
-
-  const clearBtn = document.createElement("button");
-  clearBtn.type = "button";
-  clearBtn.className = "ghost-btn";
-  clearBtn.textContent = "Wort löschen";
-
-  row.appendChild(finishBtn);
-  row.appendChild(clearBtn);
-  inputCard.appendChild(row);
-
-  finishBtn.addEventListener("click", finishWordMorseAttempt);
-  clearBtn.addEventListener("click", resetWordMorseAttempt);
-
-  injectedUI.wordActionRow = row;
-  injectedUI.finishWordBtn = finishBtn;
-  injectedUI.clearWordBtn = clearBtn;
-}
-
-function injectTextInputArea() {
-  const inputCard = livePattern.closest(".card");
-  if (!inputCard) return;
-
-  const wrap = document.createElement("div");
-  wrap.style.marginTop = "16px";
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.autocomplete = "off";
-  input.spellcheck = false;
-  input.placeholder = "Wort in Klarschrift schreiben";
-  input.style.width = "100%";
-  input.style.padding = "14px";
-  input.style.fontSize = "1.2rem";
-  input.style.borderRadius = "14px";
-  input.style.border = "2px solid #d7deea";
-  input.style.marginBottom = "10px";
-  input.style.textTransform = "uppercase";
-
-  const btnRow = document.createElement("div");
-  btnRow.style.display = "flex";
-  btnRow.style.gap = "10px";
-  btnRow.style.flexWrap = "wrap";
-
-  const checkBtn = document.createElement("button");
-  checkBtn.type = "button";
-  checkBtn.className = "secondary-btn";
-  checkBtn.textContent = "Antwort prüfen";
-
-  const revealBtn = document.createElement("button");
-  revealBtn.type = "button";
-  revealBtn.className = "ghost-btn";
-  revealBtn.textContent = "Lösung zeigen";
-
-  btnRow.appendChild(checkBtn);
-  btnRow.appendChild(revealBtn);
-
-  wrap.appendChild(input);
-  wrap.appendChild(btnRow);
-  inputCard.appendChild(wrap);
-
-  checkBtn.addEventListener("click", checkTextAnswer);
-  revealBtn.addEventListener("click", revealTextAnswer);
-
-  injectedUI.textInputWrap = wrap;
-  injectedUI.textAnswerInput = input;
-  injectedUI.textCheckBtn = checkBtn;
-  injectedUI.textRevealBtn = revealBtn;
-}
-
-// -------------------------------------
-// UI-Helfer
-// -------------------------------------
 function buildLetterSelection() {
-  if (!letterSelection) return;
-
   letterSelection.innerHTML = "";
 
   LETTERS.forEach((letter) => {
@@ -324,9 +131,8 @@ function buildLetterSelection() {
 }
 
 function updateSelectedLettersFromUI() {
-  const checked = [...letterSelection.querySelectorAll('input[type="checkbox"]:checked')]
+  selectedLetters = [...letterSelection.querySelectorAll('input[type="checkbox"]:checked')]
     .map((cb) => cb.value);
-  selectedLetters = checked;
 }
 
 function applyPreset(name) {
@@ -352,6 +158,21 @@ function updateLabels() {
   unitLabel.textContent = `${unitSlider.value} ms`;
   freqLabel.textContent = `${freqSlider.value} Hz`;
   toleranceLabel.textContent = toleranceSettings[Number(toleranceSlider.value)].name;
+}
+
+function updateMorseKeyLabels(customText) {
+  const text = customText || morseKeyLabel;
+  currentKeyLabel.textContent = text;
+  currentKeyLabel2.textContent = text;
+}
+
+function getReadableKeyName(e) {
+  if (e.code === "Space") return "Leertaste";
+  if (e.code.startsWith("Key")) return e.code.replace("Key", "");
+  if (e.code.startsWith("Digit")) return e.code.replace("Digit", "");
+  if (e.code.startsWith("Numpad")) return "Num " + e.code.replace("Numpad", "");
+  if (e.key && e.key.length === 1) return e.key.toUpperCase();
+  return e.key || e.code;
 }
 
 function setFeedback(text, type = "neutral") {
@@ -401,29 +222,18 @@ function clearLetterTimer() {
 
 function updateModeUI() {
   const letterCard = letterSelection.closest(".card");
-
   const isLetterMode = mainMode === "letter";
   const isWordMorseMode = mainMode === "word_morse";
   const isWordAudioTextMode = mainMode === "word_audio_text";
 
-  if (letterCard) {
-    letterCard.style.opacity = isLetterMode ? "1" : "0.45";
-    letterCard.style.pointerEvents = isLetterMode ? "auto" : "none";
-  }
+  letterCard.style.opacity = isLetterMode ? "1" : "0.45";
+  letterCard.style.pointerEvents = isLetterMode ? "auto" : "none";
 
-  if (injectedUI.wordActionRow) {
-    injectedUI.wordActionRow.style.display = isWordMorseMode ? "flex" : "none";
-  }
+  wordActionRow.style.display = isWordMorseMode ? "flex" : "none";
+  textInputArea.classList.toggle("hidden", !isWordAudioTextMode);
+  morseInputArea.classList.toggle("hidden", isWordAudioTextMode);
 
-  if (injectedUI.textInputWrap) {
-    injectedUI.textInputWrap.style.display = isWordAudioTextMode ? "block" : "none";
-  }
-
-  morseKey.style.display = isWordAudioTextMode ? "none" : "";
-  livePattern.style.display = isWordAudioTextMode ? "none" : "";
-  liveDecode.style.display = isWordAudioTextMode ? "none" : "";
-
-  toleranceSlider.disabled = isWordAudioTextMode ? true : false;
+  toleranceSlider.disabled = isWordAudioTextMode;
   toleranceSlider.style.opacity = isWordAudioTextMode ? "0.5" : "1";
 
   if (isLetterMode) {
@@ -441,15 +251,9 @@ function updateModeUI() {
 function updateTargetDisplay() {
   if (mainMode === "letter") {
     targetLetterEl.textContent = currentTarget;
-    return;
-  }
-
-  if (mainMode === "word_morse") {
+  } else if (mainMode === "word_morse") {
     targetLetterEl.textContent = currentTarget;
-    return;
-  }
-
-  if (mainMode === "word_audio_text") {
+  } else {
     targetLetterEl.textContent = "???";
   }
 }
@@ -491,9 +295,6 @@ function updateImmediateWordDisplay() {
   liveDecode.textContent = currentWordLetters.join("");
 }
 
-// -------------------------------------
-// Audio
-// -------------------------------------
 function ensureAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -559,11 +360,9 @@ async function playTarget() {
 
   playBtn.disabled = true;
   nextBtn.disabled = true;
-  if (mainMode !== "word_audio_text") {
-    morseKey.disabled = true;
-  }
-  if (injectedUI.textCheckBtn) injectedUI.textCheckBtn.disabled = true;
-  if (injectedUI.textRevealBtn) injectedUI.textRevealBtn.disabled = true;
+  morseKey.disabled = true;
+  textCheckBtn.disabled = true;
+  textRevealBtn.disabled = true;
 
   const unit = getUnit();
 
@@ -587,16 +386,11 @@ async function playTarget() {
 
   playBtn.disabled = false;
   nextBtn.disabled = false;
-  if (mainMode !== "word_audio_text") {
-    morseKey.disabled = false;
-  }
-  if (injectedUI.textCheckBtn) injectedUI.textCheckBtn.disabled = false;
-  if (injectedUI.textRevealBtn) injectedUI.textRevealBtn.disabled = false;
+  morseKey.disabled = false;
+  textCheckBtn.disabled = false;
+  textRevealBtn.disabled = false;
 }
 
-// -------------------------------------
-// Zielauswahl
-// -------------------------------------
 function pickNextTarget() {
   if (mainMode === "letter") {
     if (!selectedLetters.length) return;
@@ -609,8 +403,8 @@ function pickNextTarget() {
         next = selectedLetters[Math.floor(Math.random() * selectedLetters.length)];
       }
     }
-    currentTarget = next;
 
+    currentTarget = next;
     resetLetterInput();
     liveDecode.textContent = "…";
   } else {
@@ -618,14 +412,15 @@ function pickNextTarget() {
     while (next === currentTarget) {
       next = WORDS[Math.floor(Math.random() * WORDS.length)];
     }
+
     currentTarget = next;
 
     if (mainMode === "word_morse") {
       setupWordMorseDisplay();
     }
 
-    if (mainMode === "word_audio_text" && injectedUI.textAnswerInput) {
-      injectedUI.textAnswerInput.value = "";
+    if (mainMode === "word_audio_text") {
+      textAnswerInput.value = "";
     }
   }
 
@@ -640,9 +435,6 @@ function pickNextTarget() {
   }
 }
 
-// -------------------------------------
-// Buchstabenmodus
-// -------------------------------------
 function finalizeLetterModeInput() {
   if (!currentInputSymbols) return;
 
@@ -679,9 +471,6 @@ function finalizeLetterModeInput() {
   updateStats();
 }
 
-// -------------------------------------
-// Wort sehen und morsen
-// -------------------------------------
 function finalizeWordMorseLetter() {
   if (!currentInputSymbols) return;
 
@@ -696,10 +485,7 @@ function finalizeWordMorseLetter() {
     if (wordMorseDisplayMode === "immediate") {
       updateImmediateWordDisplay();
     }
-    setFeedback(
-      `Die Folge ${typedPattern} wurde als unbekannt gespeichert.`,
-      "warning"
-    );
+    setFeedback(`Die Folge ${typedPattern} wurde als unbekannt gespeichert.`, "warning");
     currentLetterIndex += 1;
     return;
   }
@@ -734,7 +520,7 @@ function finishWordMorseAttempt() {
     stats.correct += 1;
     setFeedback(`Richtig! Du hast das Wort ${currentTarget} korrekt gemorst.`, "success");
   } else {
-    setFeedback(`Nicht ganz richtig. Fehler sind markiert.`, "error");
+    setFeedback("Nicht ganz richtig. Fehler sind markiert.", "error");
   }
 
   liveDecode.innerHTML = resultMarkup;
@@ -749,8 +535,6 @@ function buildWordComparisonMarkup(target, typed) {
     const expected = target[i] || "";
     const actual = typed[i] || "∅";
     const isCorrect = expected === actual;
-
-    const displayChar = actual === "" ? "∅" : actual;
     const title = expected ? `Soll: ${expected}` : "Zu viel";
 
     html += `
@@ -767,7 +551,7 @@ function buildWordComparisonMarkup(target, typed) {
           border:1px solid ${isCorrect ? "#86efac" : "#fca5a5"};
         "
         title="${title}"
-      >${escapeHtml(displayChar)}</span>
+      >${escapeHtml(actual)}</span>
     `;
   }
 
@@ -781,9 +565,6 @@ function escapeHtml(text) {
     .replaceAll(">", "&gt;");
 }
 
-// -------------------------------------
-// Morse hören und Wort schreiben
-// -------------------------------------
 function normalizeTextInput(text) {
   return String(text || "")
     .toUpperCase()
@@ -791,9 +572,9 @@ function normalizeTextInput(text) {
 }
 
 function checkTextAnswer() {
-  if (mainMode !== "word_audio_text" || !injectedUI.textAnswerInput) return;
+  if (mainMode !== "word_audio_text") return;
 
-  const typed = normalizeTextInput(injectedUI.textAnswerInput.value);
+  const typed = normalizeTextInput(textAnswerInput.value);
   stats.attempts += 1;
 
   if (typed === currentTarget) {
@@ -815,9 +596,6 @@ function revealTextAnswer() {
   setFeedback(`Lösung: ${currentTarget}`, "warning");
 }
 
-// -------------------------------------
-// Morsetaste
-// -------------------------------------
 function handlePressStart() {
   if (isPressing) return;
   if (mainMode === "word_audio_text") return;
@@ -833,6 +611,7 @@ function handlePressStart() {
 
 function handlePressEnd() {
   if (!isPressing) return;
+  if (mainMode === "word_audio_text") return;
 
   isPressing = false;
   stopTone();
@@ -852,7 +631,7 @@ function handlePressEnd() {
     liveDecode.textContent = decoded || "…";
   } else if (mainMode === "word_morse") {
     if (wordMorseDisplayMode === "immediate") {
-      liveDecode.textContent = (currentWordLetters.join("") + (decoded || ""));
+      liveDecode.textContent = currentWordLetters.join("") + (decoded || "");
     } else {
       liveDecode.textContent = "••••";
     }
@@ -870,9 +649,6 @@ function handlePressEnd() {
   }, waitMs);
 }
 
-// -------------------------------------
-// Start / Zurück
-// -------------------------------------
 function startTraining() {
   updateSelectedLettersFromUI();
 
@@ -890,8 +666,8 @@ function startTraining() {
   pickNextTarget();
   ensureAudio();
 
-  if (mainMode === "word_audio_text" && injectedUI.textAnswerInput) {
-    setTimeout(() => injectedUI.textAnswerInput.focus(), 50);
+  if (mainMode === "word_audio_text") {
+    setTimeout(() => textAnswerInput.focus(), 50);
   }
 }
 
@@ -900,17 +676,17 @@ function goBackToStart() {
   clearLetterTimer();
 
   isPressing = false;
+  waitingForKeyChoice = false;
   currentInputSymbols = "";
   currentWordLetters = [];
   currentLetterIndex = 0;
+
+  updateMorseKeyLabels();
 
   startScreen.classList.remove("hidden");
   trainingScreen.classList.add("hidden");
 }
 
-// -------------------------------------
-// Events
-// -------------------------------------
 function setupEventListeners() {
   unitSlider.addEventListener("input", updateLabels);
   freqSlider.addEventListener("input", updateLabels);
@@ -928,8 +704,45 @@ function setupEventListeners() {
     pickNextTarget();
   });
 
+  finishWordBtn.addEventListener("click", finishWordMorseAttempt);
+  clearWordBtn.addEventListener("click", resetWordMorseAttempt);
+
+  textCheckBtn.addEventListener("click", checkTextAnswer);
+  textRevealBtn.addEventListener("click", revealTextAnswer);
+
+  textAnswerInput.addEventListener("keydown", (e) => {
+    if (mainMode === "word_audio_text" && e.key === "Enter") {
+      e.preventDefault();
+      checkTextAnswer();
+    }
+  });
+
   document.querySelectorAll(".preset-btn").forEach((btn) => {
     btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+  });
+
+  document.querySelectorAll('input[name="mainMode"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      if (radio.checked) {
+        mainMode = radio.value;
+        updateModeUI();
+      }
+    });
+  });
+
+  document.querySelectorAll('input[name="wordDisplayMode"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      if (radio.checked) {
+        wordMorseDisplayMode = radio.value;
+        updateModeUI();
+      }
+    });
+  });
+
+  chooseKeyBtn.addEventListener("click", () => {
+    waitingForKeyChoice = true;
+    updateMorseKeyLabels("nächste Taste drücken ...");
+    setFeedback("Drücke jetzt die Taste, die als Morsetaste dienen soll.", "neutral");
   });
 
   morseKey.addEventListener("pointerdown", (e) => {
@@ -951,24 +764,35 @@ function setupEventListeners() {
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.code === "Space") {
+    if (waitingForKeyChoice) {
       e.preventDefault();
-      if (!trainingScreen.classList.contains("hidden") && !e.repeat) {
-        handlePressStart();
-      }
+
+      morseKeyCode = e.code;
+      morseKeyLabel = getReadableKeyName(e);
+      waitingForKeyChoice = false;
+
+      updateMorseKeyLabels();
+      setFeedback(`Morsetaste festgelegt: ${morseKeyLabel}`, "success");
+      return;
     }
 
-    if (mainMode === "word_audio_text" && e.key === "Enter" && injectedUI.textAnswerInput) {
-      if (document.activeElement === injectedUI.textAnswerInput) {
-        e.preventDefault();
-        checkTextAnswer();
+    if (mainMode === "word_audio_text") return;
+
+    if (e.code === morseKeyCode) {
+      e.preventDefault();
+
+      if (!trainingScreen.classList.contains("hidden") && !e.repeat) {
+        handlePressStart();
       }
     }
   });
 
   document.addEventListener("keyup", (e) => {
-    if (e.code === "Space") {
+    if (mainMode === "word_audio_text") return;
+
+    if (e.code === morseKeyCode) {
       e.preventDefault();
+
       if (!trainingScreen.classList.contains("hidden")) {
         handlePressEnd();
       }
