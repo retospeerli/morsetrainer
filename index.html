@@ -10,7 +10,7 @@
   <div class="app">
     <header class="app-header">
       <h1>Morse-Lernapp</h1>
-      <p class="subtitle">Hören, nachmorsen, Buchstaben lernen</p>
+      <p class="subtitle">Hören, nachmorsen, Wörter üben</p>
     </header>
 
     <main>
@@ -35,6 +35,39 @@
           <div class="card">
             <h3>Einstellungen</h3>
 
+            <div class="info-box mode-box">
+              <p><strong>Modus:</strong></p>
+
+              <label class="mode-option">
+                <input type="radio" name="mainMode" value="letter" checked />
+                <span>Buchstaben üben</span>
+              </label>
+
+              <label class="mode-option">
+                <input type="radio" name="mainMode" value="word_morse" />
+                <span>Wort sehen und morsen</span>
+              </label>
+
+              <label class="mode-option">
+                <input type="radio" name="mainMode" value="word_audio_text" />
+                <span>Morse hören und Wort schreiben</span>
+              </label>
+
+              <hr />
+
+              <p><strong>Anzeige bei „Wort sehen und morsen“:</strong></p>
+
+              <label class="mode-option">
+                <input type="radio" name="wordDisplayMode" value="immediate" checked />
+                <span>Buchstaben sofort anzeigen</span>
+              </label>
+
+              <label class="mode-option">
+                <input type="radio" name="wordDisplayMode" value="hidden" />
+                <span>Buchstaben erst nach Überprüfung anzeigen</span>
+              </label>
+            </div>
+
             <label class="setting">
               <span>Geschwindigkeit (Punktdauer): <strong id="unitLabel">140 ms</strong></span>
               <input id="unitSlider" type="range" min="80" max="260" step="10" value="140" />
@@ -52,7 +85,7 @@
 
             <div class="info-box">
               <p><strong>Steuerung:</strong></p>
-              <p>Drücke und halte die <strong>Leertaste</strong> oder den grossen Taster auf dem Bildschirm.</p>
+              <p>Drücke und halte die gewählte Morsetaste oder den grossen Taster auf dem Bildschirm.</p>
               <p><strong>Kurz</strong> = Punkt · &nbsp;&nbsp; <strong>Lang</strong> = Strich −</p>
             </div>
 
@@ -72,32 +105,52 @@
 
         <div class="grid two training-grid">
           <div class="card target-card">
-            <p class="label">Zielbuchstabe</p>
+            <p class="label">Aufgabe</p>
             <div id="targetLetter" class="target-letter">E</div>
 
             <div class="target-actions">
               <button id="playBtn" class="secondary-btn">Vorspielen</button>
-              <button id="nextBtn" class="secondary-btn">Nächster Buchstabe</button>
+              <button id="nextBtn" class="secondary-btn">Nächste Aufgabe</button>
             </div>
 
             <div class="morse-hint">
-              <p class="small-text">Höre genau hin und morse den Buchstaben dann mit der Taste nach.</p>
+              <p class="small-text">Höre genau hin oder morse das angezeigte Zeichen/Wort nach.</p>
             </div>
           </div>
 
           <div class="card input-card">
             <p class="label">Deine Eingabe</p>
 
-            <div id="livePattern" class="live-pattern">–</div>
-            <div id="liveDecode" class="live-decode">…</div>
+            <div id="morseInputArea">
+              <div id="livePattern" class="live-pattern">–</div>
+              <div id="liveDecode" class="live-decode">…</div>
 
-            <button id="morseKey" class="morse-key" aria-label="Morsetaste">
-              Drücken und halten
-            </button>
+              <button id="morseKey" class="morse-key" aria-label="Morsetaste">
+                Drücken und halten
+              </button>
 
-            <div class="legend">
-              <div><strong>Leertaste</strong> oder Taste am Bildschirm</div>
-              <div><strong>Kurz</strong> = Punkt · &nbsp; <strong>Lang</strong> = Strich −</div>
+              <div class="legend">
+                <div><strong id="currentKeyLabel">Leertaste</strong> oder Taste am Bildschirm</div>
+                <div><strong>Kurz</strong> = Punkt · &nbsp; <strong>Lang</strong> = Strich −</div>
+              </div>
+
+              <div class="key-select-box">
+                <button id="chooseKeyBtn" class="ghost-btn" type="button">Taste auswählen</button>
+                <span>Aktuelle Morsetaste: <strong id="currentKeyLabel2">Leertaste</strong></span>
+              </div>
+
+              <div id="wordActionRow" class="word-action-row">
+                <button id="finishWordBtn" class="secondary-btn" type="button">Wort prüfen</button>
+                <button id="clearWordBtn" class="ghost-btn" type="button">Wort löschen</button>
+              </div>
+            </div>
+
+            <div id="textInputArea" class="hidden">
+              <input id="textAnswerInput" class="text-answer-input" type="text" autocomplete="off" spellcheck="false" placeholder="Wort in Klarschrift schreiben" />
+              <div class="word-action-row">
+                <button id="textCheckBtn" class="secondary-btn" type="button">Antwort prüfen</button>
+                <button id="textRevealBtn" class="ghost-btn" type="button">Lösung zeigen</button>
+              </div>
             </div>
           </div>
         </div>
